@@ -16,7 +16,23 @@
       with_items:
         - git
         - emacs
-        - zsh
+        - nix-repl
+
+    - name: set up git information
+      shell: |
+        git config --global user.name 'Allen Nelson'
+        git config --global user.email 'anelson@narrativescience.com'
+
+    - name: use auto search for bash history
+      lineinfile:
+        dest: /home/{{user}}/.inputrc
+        create: yes
+        line: "{{item}}"
+      with_items:
+        # Press up-arrow for previous matching command
+        - '"\e[A":history-search-backward'
+        # Press down-arrow for next matching command
+        - '"\e[B":history-search-forward'
 
     - name: copy ssh files
       copy:
@@ -89,3 +105,31 @@
         - {owner: adnelson, repo: nixfromnpm}
         - {owner: adnelson, repo: semver-range}
         - {owner: jwiegley, repo: hnix}
+
+    - name: set ghci options
+      file:
+        path: /home/{{user}}/.ghci
+        owner: "{{user}}"
+        group: "{{user}}"
+        contents: |
+          :set -XNoImplicitPrelude
+          :set -XOverloadedStrings
+          :set -XScopedTypeVariables
+          :set -XLambdaCase
+          :set -isrc
+          import qualified Data.HashMap.Strict as H
+          import qualified Data.Text as T
+          import qualified ClassyPrelude as CP
+          import qualified Prelude as P
+
+     - name: create global gitignore
+       copy:
+         src: global_gitignore
+         dest: /home/{{user}}/.gitignore_global
+         owner: "{{user}}"
+         group: "{{user}}"
+
+     - name: tell git to use global ignore
+       become: yes
+       become_user: "{{user}}"
+       shell: git config --global core.excludesfile ~/.gitignore_global
