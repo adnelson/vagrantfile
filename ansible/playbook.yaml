@@ -1,0 +1,91 @@
+- hosts: all
+  vars:
+    user: vagrant
+
+  tasks:
+    - name: check if nix dir exists
+      stat: {path: /nix}
+      register: slash_nix
+
+    - name: install nix
+      shell: curl -L https://nixos.org/nix/install | sh
+      when: slash_nix.stat.exists == False
+
+    - name: install some things
+      shell: $HOME/.nix-profile/bin/nix-env -iA nixpkgs.{{item}}
+      with_items:
+        - git
+        - emacs
+        - zsh
+
+    - name: copy ssh files
+      copy:
+        dest: /home/{{user}}/.ssh
+        src: "{{item}}"
+        mode: 0600
+        owner: "{{user}}"
+        group: "{{user}}"
+      with_items:
+        - ssh/secrets
+        - ssh/config
+
+    - name: add github/bitbucket ssh to known_hosts
+      become: yes
+      become_user: "{{user}}"
+      shell: ssh-keyscan {{item}} >> ~/.ssh/known_hosts
+      with_items:
+        - github.com
+        - bitbucket.com
+
+    - name: clone bash scripts
+      become: yes
+      become_user: "{{user}}"
+      git:
+        repo: https://github.com/adnelson/bash-scripts
+        dest: /home/{{user}}/.bash-scripts
+        recursive: no
+        force: yes
+
+    - name: check out submodules
+      become: yes
+      become_user: "{{user}}"
+      shell: cd ~/.bash-scripts && git submodule update --init || true
+
+    - name: run bash initialization
+      become: yes
+      become_user: "{{user}}"
+      shell: ~/.bash-scripts/initialize.sh
+
+    - name: create some directories
+      file:
+        name: "{{item}}"
+        state: directory
+        owner: "{{user}}"
+        group: "{{user}}"
+      with_items:
+        - /home/{{user}}/narr
+        - /home/{{user}}/workspace/haskell
+
+    - name: check out some ns repos
+      become: yes
+      become_user: "{{user}}"
+      git:
+        repo: https://{{ns_github_token}}@github.com/NarrativeScience/{{item}}.git
+        dest: /home/{{user}}/narr/{{item}}
+        recursive: no
+      with_items:
+        - ns_systems
+        - ns_node_packages
+        - quill
+
+    - name: check out some haskell repos
+      become: yes
+      become_user: "{{user}}"
+      git:
+        repo: https://github.com/{{item.owner}}/{{item.repo}}.git
+        dest: /home/{{user}}/workspace/haskell/{{item.repo}}
+        recursive: no
+      with_items:
+        - {owner: adnelson, repo: nixfromnpm}
+        - {owner: adnelson, repo: semver-range}
+        - {owner: jwiegley, repo: hnix}
